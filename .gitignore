@@ -1,3 +1,8 @@
 /data*
 /.venv*
 .DS_STORE*
+cg_grant_demo/target/
+cg_grant_demo/dbt_packages/
+cg_grant_demo/logs/
+cg_grant_demo/.env
+/logs*
