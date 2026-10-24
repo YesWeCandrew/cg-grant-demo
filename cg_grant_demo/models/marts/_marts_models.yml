@@ -29,3 +29,18 @@ models:
       - name: details
         description: "A textual description of the details of the grant"
 
+  - name: dim_focus_areas
+    description: "The focus areas that grants target"
+    columns:
+      - name: focus_area
+        description: "The name of the focus area the grant targets"
+      - name: focus_area_id
+        description: "A unique identifier for the focus area"
+
+  - name: dim_organizations
+    description: "The organizations that have been provided grants"
+    columns:
+      - name: organization
+        description: "The name of the organization provided the grant"
+      - name: organization_id
+        description: "A unique identifier for the organization granted"
