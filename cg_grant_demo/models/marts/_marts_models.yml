@@ -52,6 +52,10 @@ models:
         description: "The grant id of the later of the two paired grants"
       - name: first_grant_id
         description: "The grant id of the earlier of the two paired grants" 
+      - name: renewed_grant
+        description: "The name of the later of the two paired grants"
+      - name: first_grant
+        description: "The name of the earlier of the two paired grants"
       - name: renewed_grant_date
         description: "The date that the later of the two grants was made"
       - name: first_grant_date

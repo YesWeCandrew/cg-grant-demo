@@ -3,6 +3,8 @@ select
     renewed.grant_id                                        as renewed_grant_id,
     first.grant_id                                          as first_grant_id,
     org.organization                                        as organization,
+    renewed.grant                                           as renewed_grant,
+    first.grant                                             as first_grant,
     renewed.grant_date                                      as renewed_grant_date,
     first.grant_date                                        as first_grant_date,
     date_diff(renewed.grant_date, first.grant_date, month)  as months_since_first,
