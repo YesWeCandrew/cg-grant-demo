@@ -53,16 +53,16 @@ select
     focus_area,
     case 
         when focus_area is null
-        then focus_area_id 
-        else null
+        then null 
+        else focus_area_id
     end                   as focus_area_id,
     grant_date_text,
     grant_date,
     organization,
     case 
         when organization is null
-        then organization_id 
-        else null
+        then null
+        else organization_id
     end                   as organization_id,
     details
 

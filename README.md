@@ -1,6 +1,6 @@
 # CG Grants Demo
 
-This project analyses publically available data from CG on historic grants, retrieved from https://coefficientgiving.org/wp-content/uploads/Coefficient-Giving-Grants-Archive.csv.
+This project analyses publically available data retrieved from a CSV hosted on Coefficient Giving's website that describes it's historic grants.
 
 It demonstrates standard data engineering tasks, like data cleaning, preparation, modelling and visualisation using CG's data stack.
 
