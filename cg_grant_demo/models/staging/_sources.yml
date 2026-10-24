@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: cg_grants_archive
+        description: "Coefficient Giving grants archive data retrieived from CSV on 2026-10-24"
