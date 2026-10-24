@@ -5,7 +5,7 @@ with source as (
 cleaned as (
     select
         trim(Grant)                             as grant,
-        trim(`Organization Name`)               as organization_name,
+        trim(`Organization Name`)               as organization,
         trim(`Focus Area`)                      as focus_area,
         Amount                                  as amount,
         Date                                    as grant_date_text,
@@ -27,12 +27,14 @@ numbered as (
         *,
         {{ dbt_utils.generate_surrogate_key([
             'grant',
-            'organization_name',
+            'organization',
             'grant_date_text',
             'amount'
-            ]) }}                                    as grant_id,
+            ]) }}                                                   as grant_id,
+        {{dbt_utils.generate_surrogate_key(['organization'])}}        as organization_id,
+        {{dbt_utils.generate_surrogate_key(['focus_area'])}}          as focus_area_id,
         row_number() over (
-            partition by grant, organization_name, grant_date_text, amount
+            partition by grant, organization, grant_date_text, amount
             order by grant
         ) as dup_num
     
@@ -45,11 +47,21 @@ select
   
     grant_id,
     grant,
-    organization_name,
-    focus_area,
     amount,
+    focus_area,
+    case 
+        when focus_area is null
+        then focus_area_id 
+        else null
+    end                   as focus_area_id,
     grant_date_text,
     grant_date,
+    organization,
+    case 
+        when organization is null
+        then organization_id 
+        else null
+    end                   as organization_id,
     details
 
 from numbered
