@@ -1,16 +1,22 @@
 import hmac
+import altair as alt
+import pandas as pd
 import streamlit as st
-from queries import load_table
+from queries import MONTH_MARGIN, RATIO_MARGIN, RenewalDefinition, evaluate, load_table
 
 st.set_page_config(page_title="Defining a grant renewal", layout="wide")
 
+RENEWAL_COLOR = "#064D49"
+NON_RENEWAL_COLOR = "#B2CFED"
+
 def check_password() -> bool:
+    """Ask for the app password, unless require_password is turned off in secrets."""
     def password_entered():
         ok = hmac.compare_digest(st.session_state["password"], st.secrets["app_password"])
         st.session_state["authenticated"] = ok
         if ok:
             del st.session_state["password"]
-    if st.session_state.get("authenticated"):
+    if st.session_state.get("authenticated") or not st.secrets["require_password"]:
         return True
     st.text_input("Password", type="password", on_change=password_entered, key="password")
     if st.session_state.get("authenticated") is False:
@@ -21,7 +27,154 @@ if not check_password():
     st.stop()
 
 st.title("What counts as a renewal?")
-
+st.write(
+    "Explore how to define a renewal. Use the options on the left to create a definition "
+    "of a renewal and discover how it impacts data definitions."
+)
+grants = load_table(st.secrets["grants_table"])
 pairs = load_table(st.secrets["pairs_table"])
-st.write(f"Loaded {len(pairs):,} candidate grant pairs")
-st.dataframe(pairs.head(20))
+
+# --- Definition options ---
+st.sidebar.header("Define a renewal")
+min_months, max_months = st.sidebar.slider(
+    "Months between first grant and renewal", min_value=1, max_value=60, value=(12, 24)
+)
+min_ratio, max_ratio = st.sidebar.slider(
+    "Ratio of renewal amount to first grant amount",
+    min_value=0.0, max_value=5.0, value=(0.8, 2.0), step=0.05,
+    help="1.0 means the renewal was the same amount as the first grant; 2.0 means double.",
+)
+same_focus_area = st.sidebar.checkbox("Only include same focus area grants", value=True)
+
+results = evaluate(
+    grants, pairs, RenewalDefinition(min_months, max_months, min_ratio, max_ratio, same_focus_area)
+)
+
+# --- Headline numbers ---
+col1, col2, col3 = st.columns(3)
+col1.metric("Grants", f"{results.total_grants:,}", border=True)
+col2.metric("Renewed grants", f"{results.renewed_grants:,}", border=True)
+col3.metric(
+    "Repeat grants counted as renewals",
+    f"{results.renewal_share:.0%}" if results.renewal_share is not None else "–",
+    help=(
+        f"Renewals as a share of the {results.grants_with_prior:,} grants where the same organisation "
+        "received an earlier grant in the previous 60 months."
+    ),
+    border=True,
+)
+
+# --- Grants by year ---
+st.subheader("Grants by year")
+chart = (
+    alt.Chart(results.by_year)
+    .mark_bar(stroke="white", strokeWidth=1)
+    .encode(
+        x=alt.X("year:O", title=None, axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("grants:Q", title="Grants"),
+        color=alt.Color(
+            "type:N",
+            scale=alt.Scale(domain=["Renewal", "Not a renewal"], range=[RENEWAL_COLOR, NON_RENEWAL_COLOR]),
+            legend=alt.Legend(title=None, orient="top"),
+        ),
+        # Stack renewals at the bottom of each bar
+        order=alt.Order("type:N", sort="descending"),
+        tooltip=[
+            alt.Tooltip("year:O", title="Year"),
+            alt.Tooltip("type:N", title="Type"),
+            alt.Tooltip("grants:Q", title="Grants", format=","),
+        ],
+    )
+)
+st.altair_chart(chart, width="stretch")
+
+# --- Renewal and near-miss tables ---
+# Columns shown in the tables; the pop-out shows the rest
+PAIR_COLUMNS = {
+    "organization": st.column_config.TextColumn("Organisation"),
+    "first_grant_date": st.column_config.DateColumn("First grant date", format="MMM YYYY"),
+    "renewed_grant_date": st.column_config.DateColumn("Second grant date", format="MMM YYYY"),
+    "first_amount": st.column_config.NumberColumn("First grant amount", format="dollar"),
+    "renewed_amount": st.column_config.NumberColumn("Second grant amount", format="dollar"),
+}
+
+def show_grant(pair: pd.Series, prefix: str):
+    """Show one side of a pair; prefix is "first" or "renewed", matching the mart's column names."""
+    fields = {
+        "Name": pair[f"{prefix}_grant"],
+        "Amount": f"${pair[f'{prefix}_amount']:,.0f}",
+        "Date": f"{pd.to_datetime(pair[f'{prefix}_grant_date']):%B %Y}",
+        "Focus area": pair[f"{prefix}_focus_area"],
+        "Details": pair[f"{prefix}_details"],
+    }
+    for label, value in fields.items():
+        st.caption(label)
+        # Escape $ so Streamlit doesn't render text between two dollar signs as maths
+        st.markdown(str(value or "–").replace("$", r"\$"))
+
+def show_pair(pair: pd.Series):
+    """Pop-out content: shared figures at the top, then the two grants side by side."""
+    months, ratio = st.columns(2)
+    months.metric("Months apart", f"{pair['months_since_first']}")
+    ratio.metric("Amount ratio", f"{pair['amount_ratio']:.2f}")
+    # Only near misses have a reason
+    if pair.get("reason"):
+        st.markdown(f"**Why it's excluded:** {pair['reason']}")
+
+    first, second = st.columns(2, border=True)
+    with first:
+        st.subheader("First grant")
+        show_grant(pair, "first")
+    with second:
+        st.subheader("Second grant")
+        show_grant(pair, "renewed")
+
+# Tables are keyed by a version number. Bumping it when the pop-out closes clears their
+# selections, so the pop-out doesn't reopen on the next rerun and the same row can be clicked again.
+st.session_state.setdefault("table_version", 0)
+
+def reset_selections():
+    st.session_state.table_version += 1
+
+def pair_table(df: pd.DataFrame, key: str) -> pd.Series | None:
+    """Show a table of pairs and return the selected pair, if any."""
+    event = st.dataframe(
+        df[list(PAIR_COLUMNS)],
+        column_config=PAIR_COLUMNS,
+        hide_index=True,
+        width="stretch",
+        on_select="rerun",
+        # Cell selection lets a click anywhere on a row open it, without a checkbox column
+        selection_mode="single-cell",
+        key=f"{key}_{st.session_state.table_version}",
+    )
+    st.caption("Click a row to compare the two grants.")
+    cells = event.selection.cells
+    return df.iloc[cells[0][0]] if cells else None
+
+renewals_tab, near_tab = st.tabs(
+    [f"Renewals ({len(results.renewals):,})", f"Near misses ({len(results.near_misses):,})"]
+)
+with renewals_tab:
+    selected_renewal = pair_table(results.renewals, key="renewals")
+with near_tab:
+    st.write(
+        "Pairs of grants to the same organisation that fail just one part of the definition, "
+        f"and are within {MONTH_MARGIN} months of the month range or {RATIO_MARGIN} of the ratio range. "
+        "The second grant isn't counted as a renewal of any other grant."
+    )
+    selected_near_miss = pair_table(results.near_misses, key="near_misses")
+
+# Only one pop-out can open per run, so a renewal takes priority over a near miss
+selected = selected_renewal if selected_renewal is not None else selected_near_miss
+if selected is not None:
+    st.dialog(selected["organization"], width="large", on_dismiss=reset_selections)(show_pair)(selected)
+
+st.info(
+    "**How grants are paired:** an organisation may have several earlier grants that could "
+    "each count as the first grant of a renewal. A grant is only treated as a renewal of the "
+    "**most recent** earlier grant that meets the definition. For example, if grants 1, 2 and 3 "
+    "all qualify, grant 3 is a renewal of grant 2 and grant 2 is a renewal of grant 1 — grant 3 "
+    "is not a renewal of grant 1. If grant 2 didn't meet the definition, grant 3 would be a "
+    "renewal of grant 1. Grants made in the same month aren't treated as renewals of each other."
+)

@@ -8,5 +8,5 @@ cg_grant_demo/.env
 cg_grant_demo/dbt_internal_packages/
 /logs*
 .vscode*
-.streamlit*
+.streamlit/secrets.toml
 /app/__pycache__*
