@@ -44,3 +44,35 @@ models:
         description: "The name of the organization provided the grant"
       - name: organization_id
         description: "A unique identifier for the organization granted"
+
+  - name: mart_grant_pairs
+    description: "Pairs of grants that could potentially be renewals, depending on definitions"
+    columns:
+      - name: renewed_grant_id
+        description: "The grant id of the later of the two paired grants"
+      - name: first_grant_id
+        description: "The grant id of the earlier of the two paired grants" 
+      - name: renewed_grant_date
+        description: "The date that the later of the two grants was made"
+      - name: first_grant_date
+        description: "The date that the first of the two grants were made"
+      - name: organization
+        description: "The name of the organisation the grant is for"
+      - name: months_since_first
+        description: "The months between the first and the second grant"
+      - name: amount_ratio
+        description: "The ratio of the amount that the second grant was for"
+      - name: renewed_amount
+        description: "The amount of the later of the two paired grants"
+      - name: first_amount
+        description: "The amount of the earlier of the two paired grants" 
+      - name: renewed_focus_area 
+        description:  "The focus area of the later of the two paired grants"
+      - name: first_focus_area
+        description: "The focus area of earlier of the two paired grants" 
+      - name: same_focus_area
+        description: "Whether the grants are for the same focus area"
+      - name: renewed_details
+        description: "The details of the later of the two paired grants"      
+      - name: first_details
+        description: "The details of the earlier of the two paired grants" 
