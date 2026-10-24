@@ -13,6 +13,8 @@ cleaned as (
         trim(Details)                           as details
 
     from source
+
+    where Amount is not null -- Removing poor quality data from inclusion in this analysis.
 ),
 
 -- There is a duplicate in the data, but I would want future duplicates
