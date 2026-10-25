@@ -19,6 +19,10 @@ def check_password() -> bool:
             del st.session_state["password"]
     if st.session_state.get("authenticated") or not st.secrets["require_password"]:
         return True
+    url_password = st.query_params.get("password")
+    if url_password and hmac.compare_digest(url_password, st.secrets["app_password"]):
+        st.session_state["authenticated"] = True
+        return True
     st.write("Please enter the password to access this dashboard.")
     st.text_input("Password", type="password", on_change=password_entered, key="password")
     if st.session_state.get("authenticated") is False:
