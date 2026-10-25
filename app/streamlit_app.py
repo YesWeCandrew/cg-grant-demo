@@ -46,7 +46,7 @@ grants, pairs = load_tables(st.secrets["grants_table"], st.secrets["pairs_table"
 st.sidebar.header("Define a renewal")
 min_months, max_months = st.sidebar.slider(
     "Months between first grant and renewal",
-    min_value=1, max_value=60, value=(12, 24),
+    min_value=0, max_value=160, value=(12, 24),
     help="Only subsequent grants that occured between the months specified here will be counted as a renewal. For example, 12 to 24 months means the second grant must be at least a year after the earlier, and at most 2 years."
 )
 min_percent, max_percent = st.sidebar.slider(
@@ -76,7 +76,7 @@ col1.metric("Grants", f"{results.total_grants:,}", border=True)
 col2.metric(
     "Repeat grants",
     f"{results.repeat_grants:,}",
-    help="Grants where the same organisation received an earlier grant in the previous 60 months, in any focus area. These are potential candidates to be renewals.",
+    help="Grants where the same organisation received an earlier grant, in any focus area. These are potential candidates to be renewals.",
     border=True,
 )
 col3.metric(
@@ -89,7 +89,7 @@ col4.metric(
     f"{results.renewal_share:.0%}" if results.renewal_share is not None else "–",
     help=(
         f"Renewals as a share of the {results.repeat_grants:,} grants where the same organisation "
-        "received an earlier grant in the previous 60 months."
+        "received an earlier grant."
     ),
     border=True,
 )
@@ -211,6 +211,5 @@ st.info(
     "of each other. A grant is only treated as a renewal of the **most recent** earlier grant "
     "that meets the definition. For example, if grants are given in 2021, 2022 and 2023 and all qualify "
     "as renewals, the 2023 grant is a renewal of 2022, and 2022 is a renewal of 2021. 2023 "
-    "is not a renewal of grant 2021 because the 2022 grant is more recent. Grants made in "
-    "the same month aren't treated as renewals of each other."
+    "is not a renewal of grant 2021 because the 2022 grant is more recent."
 )

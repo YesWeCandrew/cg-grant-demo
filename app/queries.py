@@ -2,6 +2,7 @@
 
 A "pair" is a row of mart_grant_pairs: two grants to the same organisation, where the
 second (renewed) grant came after the first. Each grant can appear in many pairs.
+Whether a grant is a first or repeat grant is defined in dbt, as grant_sequence in fct_grants.
 """
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -58,8 +59,7 @@ class RenewalResults:
 
 def apply_definition(pairs: pd.DataFrame, definition: RenewalDefinition) -> pd.DataFrame:
     """Flag which parts of the definition each candidate pair meets."""
-    # Same-month pairs appear in both directions in the mart, so neither can be a renewal of the other
-    pairs = pairs[pairs["months_since_first"] >= 1].copy()
+    pairs = pairs.copy()
     pairs["months_ok"] = pairs["months_since_first"].between(definition.min_months, definition.max_months)
     pairs["ratio_ok"] = pairs["amount_ratio"].between(definition.min_ratio, definition.max_ratio)
     pairs["focus_ok"] = pairs["same_focus_area"].fillna(False) | (not definition.same_focus_area)
@@ -124,7 +124,7 @@ def evaluate(grants: pd.DataFrame, pairs: pd.DataFrame, definition: RenewalDefin
     pairs = apply_definition(pairs, definition)
     renewals = find_renewals(pairs)
     renewed_ids = set(renewals["renewed_grant_id"])
-    repeat_ids = set(pairs["renewed_grant_id"])
+    repeat_ids = set(grants.loc[grants["grant_sequence"] == "Repeat", "grant_id"])
     return RenewalResults(
         total_grants=len(grants),
         renewed_grants=len(renewed_ids),
