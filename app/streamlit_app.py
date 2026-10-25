@@ -194,7 +194,8 @@ with renewals_tab:
 with near_tab:
     st.write(
         "This section shows pairs of grants to the same organisation that fail just one part of the selected definition, "
-        f"and are otherwise close to qualifying as a renewal."
+        f"and are otherwise close to qualifying as a renewal. Like renewals, each grant is only shown against "
+        "its most recent near-miss earlier grant."
     )
     st.write(
         "Select a row to see more details of why it does not count as a renewal and decide if you need to adjust your definition."
@@ -208,8 +209,9 @@ if selected is not None:
 
 st.info(
     "**A data note:** An organisation may have several grants that could each count as renewals "
-    "of each other. A grant is only treated as a renewal of the **most recent** earlier grant "
+    "of each other. A grant is only treated as a renewal or near miss of the **most recent** earlier grant "
     "that meets the definition. For example, if grants are given in 2021, 2022 and 2023 and all qualify "
     "as renewals, the 2023 grant is a renewal of 2022, and 2022 is a renewal of 2021. 2023 "
-    "is not a renewal of grant 2021 because the 2022 grant is more recent."
+    "is not a renewal of grant 2021 because the 2022 grant is more recent. This prevents organizations"
+    "with many grants from causing exponentially large numbers of similar rows."
 )

@@ -66,15 +66,19 @@ def apply_definition(pairs: pd.DataFrame, definition: RenewalDefinition) -> pd.D
     pairs["qualifies"] = pairs["months_ok"] & pairs["ratio_ok"] & pairs["focus_ok"]
     return pairs
 
-def find_renewals(pairs: pd.DataFrame) -> pd.DataFrame:
-    """Pair each renewed grant with its most recent qualifying earlier grant, tie-breaking on the closest amount."""
+def most_recent_pair(pairs: pd.DataFrame) -> pd.DataFrame:
+    """Keep one pair per later grant: its most recent earlier grant, tie-breaking on the closest amount."""
     return (
-        pairs[pairs["qualifies"]]
+        pairs
         .assign(ratio_distance=lambda df: (df["amount_ratio"] - 1).abs())
         .sort_values(["first_grant_date", "ratio_distance"], ascending=[False, True])
         .drop_duplicates("renewed_grant_id")
         .sort_values("renewed_grant_date", ascending=False)
     )
+
+def find_renewals(pairs: pd.DataFrame) -> pd.DataFrame:
+    """Pair each renewed grant with its most recent qualifying earlier grant."""
+    return most_recent_pair(pairs[pairs["qualifies"]])
 
 def exclusion_reason(pair: pd.Series, d: RenewalDefinition) -> str:
     """Describe the one rule a near miss fails."""
@@ -87,17 +91,20 @@ def exclusion_reason(pair: pd.Series, d: RenewalDefinition) -> str:
     return f"Different focus area ({pair['first_focus_area']} → {pair['renewed_focus_area']})"
 
 def find_near_misses(pairs: pd.DataFrame, renewed_ids: set, d: RenewalDefinition) -> pd.DataFrame:
-    """Pairs that fail exactly one rule, close to the threshold, where the later grant isn't already a renewal."""
+    """Pairs that fail exactly one rule, close to the threshold, where the later grant isn't already a renewal.
+
+    Like renewals, each later grant is only paired with its most recent near-miss earlier grant.
+    """
     near = pairs[~pairs["renewed_grant_id"].isin(renewed_ids)].copy()
     rules_failed = (~near[["months_ok", "ratio_ok", "focus_ok"]]).sum(axis=1)
     months_close = near["months_since_first"].between(d.min_months - MONTH_MARGIN, d.max_months + MONTH_MARGIN)
     ratio_close = near["amount_ratio"].between(d.min_ratio - RATIO_MARGIN, d.max_ratio + RATIO_MARGIN)
-    near = near[
+    near = most_recent_pair(near[
         (rules_failed == 1)
         # A failed month or ratio rule only counts if it's within the margin
         & (near["months_ok"] | months_close)
         & (near["ratio_ok"] | ratio_close)
-    ].sort_values("renewed_grant_date", ascending=False)
+    ])
     near["reason"] = [exclusion_reason(pair, d) for _, pair in near.iterrows()]
     return near
 
