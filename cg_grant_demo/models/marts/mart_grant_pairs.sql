@@ -3,8 +3,6 @@ select
     renewed.grant_id                                        as renewed_grant_id,
     first.grant_id                                          as first_grant_id,
     org.organization                                        as organization,
-    renewed.grant                                           as renewed_grant,
-    first.grant                                             as first_grant,
     renewed.grant_date                                      as renewed_grant_date,
     first.grant_date                                        as first_grant_date,
     date_diff(renewed.grant_date, first.grant_date, month)  as months_since_first,
@@ -13,9 +11,7 @@ select
     first.amount                                            as first_amount,
     renewed_fa.focus_area                                   as renewed_focus_area,
     first_fa.focus_area                                     as first_focus_area,
-    renewed.focus_area_id = first.focus_area_id             as same_focus_area,
-    renewed.details                                         as renewed_details,
-    first.details                                           as first_details
+    renewed.focus_area_id = first.focus_area_id             as same_focus_area
 
 from {{ ref('fct_grants') }} renewed
 
