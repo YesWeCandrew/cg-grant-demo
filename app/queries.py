@@ -47,14 +47,14 @@ class RenewalResults:
     """Everything the dashboard shows for a given definition."""
     total_grants: int
     renewed_grants: int
-    grants_with_prior: int  # grants where the organisation had an earlier grant
+    repeat_grants: int  
     by_year: pd.DataFrame
     renewals: pd.DataFrame
     near_misses: pd.DataFrame
 
     @property
     def renewal_share(self) -> float | None:
-        return self.renewed_grants / self.grants_with_prior if self.grants_with_prior else None
+        return self.renewed_grants / self.repeat_grants if self.repeat_grants else None
 
 def apply_definition(pairs: pd.DataFrame, definition: RenewalDefinition) -> pd.DataFrame:
     """Flag which parts of the definition each candidate pair meets."""
@@ -128,7 +128,7 @@ def evaluate(grants: pd.DataFrame, pairs: pd.DataFrame, definition: RenewalDefin
     return RenewalResults(
         total_grants=len(grants),
         renewed_grants=len(renewed_ids),
-        grants_with_prior=len(repeat_ids),
+        repeat_grants=len(repeat_ids),
         by_year=grants_by_year(grants, repeat_ids, renewed_ids),
         renewals=renewals,
         near_misses=find_near_misses(pairs, renewed_ids, definition),

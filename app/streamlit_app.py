@@ -75,7 +75,7 @@ col1, col2, col3, col4 = st.columns(4)
 col1.metric("Grants", f"{results.total_grants:,}", border=True)
 col2.metric(
     "Repeat grants",
-    f"{results.grants_with_prior:,}",
+    f"{results.repeat_grants:,}",
     help="Grants where the same organisation received an earlier grant in the previous 60 months, in any focus area. These are potential candidates to be renewals.",
     border=True,
 )
@@ -88,7 +88,7 @@ col4.metric(
     "Repeat grants counted as renewals",
     f"{results.renewal_share:.0%}" if results.renewal_share is not None else "–",
     help=(
-        f"Renewals as a share of the {results.grants_with_prior:,} grants where the same organisation "
+        f"Renewals as a share of the {results.repeat_grants:,} grants where the same organisation "
         "received an earlier grant in the previous 60 months."
     ),
     border=True,
@@ -192,8 +192,7 @@ with renewals_tab:
 with near_tab:
     st.write(
         "Pairs of grants to the same organisation that fail just one part of the definition, "
-        f"and are within {MONTH_MARGIN} months of the month range or {RATIO_MARGIN:.0%} of the percentage range. "
-        "The second grant isn't counted as a renewal of any other grant."
+        f"and are within {MONTH_MARGIN} months of the month range or {RATIO_MARGIN:.0%} of the amount ratio. "
     )
     selected_near_miss = pair_table(results.near_misses, key="near_misses")
 
