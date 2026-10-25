@@ -180,7 +180,6 @@ def pair_table(df: pd.DataFrame, key: str) -> pd.Series | None:
         selection_mode="single-cell",
         key=f"{key}_{st.session_state.table_version}",
     )
-    st.caption("Click a row to compare the two grants.")
     cells = event.selection.cells
     return df.iloc[cells[0][0]] if cells else None
 
@@ -188,11 +187,17 @@ renewals_tab, near_tab = st.tabs(
     [f"Renewals ({len(results.renewals):,})", f"Near misses ({len(results.near_misses):,})"]
 )
 with renewals_tab:
+    st.write(
+        "Select a row to see more details and determine whether it fits your chosen definition. "
+    )
     selected_renewal = pair_table(results.renewals, key="renewals")
 with near_tab:
     st.write(
-        "Pairs of grants to the same organisation that fail just one part of the definition, "
-        f"and are within {MONTH_MARGIN} months of the month range or {RATIO_MARGIN:.0%} of the amount ratio. "
+        "This section shows pairs of grants to the same organisation that fail just one part of the selected definition, "
+        f"and are otherwise close to qualifying as a renewal."
+    )
+    st.write(
+        "Select a row to see more details of why it does not count as a renewal and decide if you need to adjust your definition."
     )
     selected_near_miss = pair_table(results.near_misses, key="near_misses")
 
@@ -202,10 +207,10 @@ if selected is not None:
     st.dialog(selected["organization"], width="large", on_dismiss=reset_selections)(show_pair)(selected)
 
 st.info(
-    "**How grants are paired:** an organisation may have several earlier grants that could "
-    "each count as the first grant of a renewal. A grant is only treated as a renewal of the "
-    "**most recent** earlier grant that meets the definition. For example, if grants 1, 2 and 3 "
-    "all qualify, grant 3 is a renewal of grant 2 and grant 2 is a renewal of grant 1 — grant 3 "
-    "is not a renewal of grant 1. If grant 2 didn't meet the definition, grant 3 would be a "
-    "renewal of grant 1. Grants made in the same month aren't treated as renewals of each other."
+    "**A data note:** An organisation may have several grants that could each count as renewals "
+    "of each other. A grant is only treated as a renewal of the **most recent** earlier grant "
+    "that meets the definition. For example, if grants are given in 2021, 2022 and 2023 and all qualify "
+    "as renewals, the 2023 grant is a renewal of 2022, and 2022 is a renewal of 2021. 2023 "
+    "is not a renewal of grant 2021 because the 2022 grant is more recent. Grants made in "
+    "the same month aren't treated as renewals of each other."
 )
