@@ -2,12 +2,13 @@ import hmac
 import altair as alt
 import pandas as pd
 import streamlit as st
-from queries import MONTH_MARGIN, RATIO_MARGIN, RenewalDefinition, evaluate, load_tables
+from queries import GRANT_TYPES, MONTH_MARGIN, RATIO_MARGIN, RenewalDefinition, evaluate, load_tables
 
 st.set_page_config(page_title="What counts as a renewal?", layout="wide")
 
 RENEWAL_COLOR = "#064D49"
-NON_RENEWAL_COLOR = "#B2CFED"
+REPEAT_COLOR = "#fac2de"
+ONE_OFF_GRANT_COLOR = "#B2CFED"
 
 def check_password() -> bool:
     """Ask for the app password, unless require_password is turned off in secrets."""
@@ -62,7 +63,7 @@ percent = f"{min_percent}%" if min_percent == max_percent else f"between {min_pe
 focus = ", `is in the same focus area`" if same_focus_area else ""
 st.markdown(
     f"##### A grant is a renewal if it's made `{months}` after an earlier grant to the same "
-    f"organisation{focus}, and is `{percent}` of the amount of that grant.**"
+    f"organisation{focus}, and is `{percent}` of the amount of that grant."
 )
 
 results = evaluate(
@@ -70,10 +71,20 @@ results = evaluate(
 )
 
 # --- Headline numbers ---
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("Grants", f"{results.total_grants:,}", border=True)
-col2.metric("Renewed grants", f"{results.renewed_grants:,}", border=True)
+col2.metric(
+    "Repeat grants",
+    f"{results.grants_with_prior:,}",
+    help="Grants where the same organisation received an earlier grant in the previous 60 months, in any focus area. These are potential candidates to be renewals.",
+    border=True,
+)
 col3.metric(
+    "Renewed grants",
+    f"{results.renewed_grants:,}",
+    border=True,
+    help="The number of grants that meet your definition of renewed.")
+col4.metric(
     "Repeat grants counted as renewals",
     f"{results.renewal_share:.0%}" if results.renewal_share is not None else "–",
     help=(
@@ -93,11 +104,11 @@ chart = (
         y=alt.Y("grants:Q", title="Grants"),
         color=alt.Color(
             "type:N",
-            scale=alt.Scale(domain=["Renewal", "Not a renewal"], range=[RENEWAL_COLOR, NON_RENEWAL_COLOR]),
+            scale=alt.Scale(domain=GRANT_TYPES, range=[RENEWAL_COLOR, REPEAT_COLOR, ONE_OFF_GRANT_COLOR]),
             legend=alt.Legend(title=None, orient="top"),
         ),
-        # Stack renewals at the bottom of each bar
-        order=alt.Order("type:N", sort="descending"),
+        # Stack renewals at the bottom of each bar, then other repeat grants
+        order=alt.Order("type_order:Q"),
         tooltip=[
             alt.Tooltip("year:O", title="Year"),
             alt.Tooltip("type:N", title="Type"),

@@ -73,7 +73,7 @@ def find_renewals(pairs: pd.DataFrame) -> pd.DataFrame:
         .assign(ratio_distance=lambda df: (df["amount_ratio"] - 1).abs())
         .sort_values(["first_grant_date", "ratio_distance"], ascending=[False, True])
         .drop_duplicates("renewed_grant_id")
-        .sort_values(["organization", "renewed_grant_date"])
+        .sort_values("renewed_grant_date", ascending=False)
     )
 
 def exclusion_reason(pair: pd.Series, d: RenewalDefinition) -> str:
@@ -97,18 +97,24 @@ def find_near_misses(pairs: pd.DataFrame, renewed_ids: set, d: RenewalDefinition
         # A failed month or ratio rule only counts if it's within the margin
         & (near["months_ok"] | months_close)
         & (near["ratio_ok"] | ratio_close)
-    ].sort_values(["organization", "renewed_grant_date"])
+    ].sort_values("renewed_grant_date", ascending=False)
     near["reason"] = [exclusion_reason(pair, d) for _, pair in near.iterrows()]
     return near
 
-def grants_by_year(grants: pd.DataFrame, renewed_ids: set) -> pd.DataFrame:
-    """Count grants per year, split into renewals and non-renewals."""
+# Grant types in the chart, in stacking order from the bottom of each bar
+GRANT_TYPES = ["Renewal", "Repeat grant", "First grants"]
+
+def grants_by_year(grants: pd.DataFrame, repeat_ids: set, renewed_ids: set) -> pd.DataFrame:
+    """Count grants per year, split into renewals, other repeat grants and non-repeat grants."""
+    type_index = grants["grant_id"].isin(renewed_ids).map({True: 0, False: 2})
+    type_index[grants["grant_id"].isin(repeat_ids - renewed_ids)] = 1
     return (
         grants.assign(
             year=pd.to_datetime(grants["grant_date"]).dt.year,
-            type=grants["grant_id"].isin(renewed_ids).map({True: "Renewal", False: "Not a renewal"}),
+            type_order=type_index,
+            type=type_index.map(dict(enumerate(GRANT_TYPES))),
         )
-        .groupby(["year", "type"])
+        .groupby(["year", "type", "type_order"])
         .size()
         .reset_index(name="grants")
     )
@@ -118,11 +124,12 @@ def evaluate(grants: pd.DataFrame, pairs: pd.DataFrame, definition: RenewalDefin
     pairs = apply_definition(pairs, definition)
     renewals = find_renewals(pairs)
     renewed_ids = set(renewals["renewed_grant_id"])
+    repeat_ids = set(pairs["renewed_grant_id"])
     return RenewalResults(
         total_grants=len(grants),
         renewed_grants=len(renewed_ids),
-        grants_with_prior=pairs["renewed_grant_id"].nunique(),
-        by_year=grants_by_year(grants, renewed_ids),
+        grants_with_prior=len(repeat_ids),
+        by_year=grants_by_year(grants, repeat_ids, renewed_ids),
         renewals=renewals,
         near_misses=find_near_misses(pairs, renewed_ids, definition),
     )
