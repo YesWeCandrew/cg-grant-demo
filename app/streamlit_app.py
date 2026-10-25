@@ -19,25 +19,27 @@ def check_password() -> bool:
             del st.session_state["password"]
     if st.session_state.get("authenticated") or not st.secrets["require_password"]:
         return True
+    st.write("Please enter the password to access this dashboard.")
     st.text_input("Password", type="password", on_change=password_entered, key="password")
     if st.session_state.get("authenticated") is False:
         st.error("Incorrect password")
     return False
 
+st.title("What counts as a renewal?")
+
 if not check_password():
     st.stop()
 
-st.title("What counts as a renewal?")
 st.write(
-    "This dashboard explores metadata based definitions of a renewed grant."
+    "This dashboard explores metadata-based definitions of a renewed grant."
 )
 st.write(
-    "Grant renewals, where one organization is given a related subsequent grant after an initial grant, "
+    "Grant renewals, where an organization is given a related grant after an initial grant, "
     "are not indicated in the source data. This dashboard explores whether it is possible to create a definition "
-    "to identify genuine renewals using only grant metadata, such as amount, date and focus area - and no contextual information."
+    "that identifies genuine renewals using only grant metadata, such as amount, date and focus area, with no contextual information."
 )
 st.write(
-    "Using the options on the left, choose your definitions to see how it impacts what counts as a renewal. "
+    "Use the options on the left to choose your definition and see how it changes what counts as a renewal. "
     "Your current definition is:"
 )
 grants, pairs = load_tables(st.secrets["grants_table"], st.secrets["pairs_table"])
@@ -47,12 +49,12 @@ st.sidebar.header("Define a renewal")
 min_months, max_months = st.sidebar.slider(
     "Months between first grant and renewal",
     min_value=0, max_value=160, value=(12, 24),
-    help="Only subsequent grants that occured between the months specified here will be counted as a renewal. For example, 12 to 24 months means the second grant must be at least a year after the earlier, and at most 2 years."
+    help="Only subsequent grants made within the months specified here count as a renewal. For example, 12 to 24 months means the second grant must be at least one year and at most two years after the earlier grant."
 )
 min_percent, max_percent = st.sidebar.slider(
     "Renewed amount as a percent of first grant amount",
     min_value=0, max_value=500, value=(80, 200), step=5, format="%d%%",
-    help="Only subsequent grants that are for a value between the percentages of the first grant defined here will be included. For example, 80% to 200% means the second grant must be the at least 80% of the size of the earlier, and at most twice as large to count as a renewal.",
+    help="Only subsequent grants worth between these percentages of the first grant count as a renewal. For example, 80% to 200% means the second grant must be at least 80% of the size of the earlier grant, and at most twice as large.",
 )
 # The renewal logic works in ratios, so 100% is a ratio of 1.0
 min_ratio, max_ratio = min_percent / 100, max_percent / 100
@@ -63,7 +65,7 @@ percent = f"{min_percent}%" if min_percent == max_percent else f"between {min_pe
 focus = ", `is in the same focus area`" if same_focus_area else ""
 st.markdown(
     f"##### A grant is a renewal if it's made `{months}` after an earlier grant to the same "
-    f"organisation{focus}, and is `{percent}` of the amount of that grant."
+    f"organization{focus}, and is `{percent}` of the amount of that grant."
 )
 
 results = evaluate(
@@ -76,7 +78,7 @@ col1.metric("Grants", f"{results.total_grants:,}", border=True)
 col2.metric(
     "Repeat grants",
     f"{results.repeat_grants:,}",
-    help="Grants where the same organisation received an earlier grant, in any focus area. These are potential candidates to be renewals.",
+    help="Grants where the same organization received an earlier grant, in any focus area. These are potential candidates to be renewals.",
     border=True,
 )
 col3.metric(
@@ -88,7 +90,7 @@ col4.metric(
     "Repeat grants counted as renewals",
     f"{results.renewal_share:.0%}" if results.renewal_share is not None else "–",
     help=(
-        f"Renewals as a share of the {results.repeat_grants:,} grants where the same organisation "
+        f"Renewals as a share of the {results.repeat_grants:,} grants where the same organization "
         "received an earlier grant."
     ),
     border=True,
@@ -121,7 +123,7 @@ st.altair_chart(chart, width="stretch")
 # --- Renewal and near-miss tables ---
 # Columns shown in the tables; the pop-out shows the rest
 PAIR_COLUMNS = {
-    "organization": st.column_config.TextColumn("Organisation"),
+    "organization": st.column_config.TextColumn("Organization"),
     "first_grant_date": st.column_config.DateColumn("First grant date", format="MMM YYYY"),
     "renewed_grant_date": st.column_config.DateColumn("Second grant date", format="MMM YYYY"),
     "first_amount": st.column_config.NumberColumn("First grant amount", format="dollar"),
@@ -190,17 +192,17 @@ renewals_tab, near_tab = st.tabs(
 )
 with renewals_tab:
     st.write(
-        "Select a row to see more details and determine whether it fits your chosen definition. "
+        "Select a row to see more details and decide whether it fits your chosen definition."
     )
     selected_renewal = pair_table(results.renewals, key="renewals")
 with near_tab:
     st.write(
-        "This section shows pairs of grants to the same organisation that fail just one part of the selected definition, "
-        f"and are otherwise close to qualifying as a renewal. Like renewals, each grant is only shown against "
+        "This section shows pairs of grants to the same organization that fail just one part of the selected definition, "
+        "and are otherwise close to qualifying as a renewal. Like renewals, each grant is only shown against "
         "its most recent near-miss earlier grant."
     )
     st.write(
-        "Select a row to see more details of why it does not count as a renewal and decide if you need to adjust your definition."
+        "Select a row to see why it doesn't count as a renewal and decide whether to adjust your definition."
     )
     selected_near_miss = pair_table(results.near_misses, key="near_misses")
 
@@ -209,11 +211,58 @@ selected = selected_renewal if selected_renewal is not None else selected_near_m
 if selected is not None:
     st.dialog(selected["organization"], width="large", on_dismiss=reset_selections)(show_pair)(selected)
 
+# --- Findings ---
+st.divider()
+st.subheader("My findings")
+st.write(
+    "This dashboard is designed to be experimented with to find a *good definition* of a renewal. "
+     "New definitions can be created and explored to see which grants fall into each category."
+)
+st.write(
+    "However, to decide which definition is best, or whether a metadata-based definition is even possible, "
+    "I'd need more context about how the term renewal is used at CG. That context would let me propose "
+    "a definition that mirrors the reality on the ground."
+)
+
+st.write(
+    "From my limited knowledge just from exploring the data, I don't think a simple metadata-only definition is possible. There are many "
+    "grants that are independent but look similar, and many renewals that are much larger than the original grant."
+)
+st.write(
+    "One key issue is that focus area names change over time, so related grants focused on the same area "
+    "can be categorized as separate. To improve this, I'd seek to understand how focus area names have "
+    "changed over time, to enable better historical analysis."
+)
+st.write(
+    "While amount, date and focus area may not be enough to define renewals, the details column holds "
+    "rich data that could help inform a definition. Some grants explicitly mention previous grants; others "
+    "are clearly focused on the same area. A few techniques could be used to identify renewals:"
+)
+APPROACHES = {
+    "Text embeddings": "Turn each grant's details into embeddings, and use the distance between pairs of "
+    "grants to provide another factor that can help determine whether they are similar enough to count as a renewal.",
+    "LLM analysis": "Find grants whose details explicitly describe them as a renewal, and identify the previous "
+    "grant. This could be a standalone definition for historic data, or a source of truth for uncovering "
+    "other factors closely linked to being a renewal.",
+    "Decision tree model": "Build a categorization model from a human-reviewed set of renewals and non-renewals.",
+    "Human review": "This dataset isn't huge, so reviewing candidate renewals by hand would give the highest "
+    "quality result. If a permanent improvement is planned, such as linking grants to their renewals, "
+    "combining human review with the options above would ensure high quality historic data.",
+}
+for row in (list(APPROACHES.items())[:2], list(APPROACHES.items())[2:]):
+    for column, (title, description) in zip(st.columns(2), row):
+        with column.container(border=True, height="stretch"):
+            st.markdown(f"**{title}**")
+            st.write(description)
+
+
+# --- Data note ----
+
 st.info(
-    "**A data note:** An organisation may have several grants that could each count as renewals "
+    "**A data note:** An organization may have several grants that could each count as renewals "
     "of each other. A grant is only treated as a renewal or near miss of the **most recent** earlier grant "
     "that meets the definition. For example, if grants are given in 2021, 2022 and 2023 and all qualify "
-    "as renewals, the 2023 grant is a renewal of 2022, and 2022 is a renewal of 2021. 2023 "
-    "is not a renewal of grant 2021 because the 2022 grant is more recent. This prevents organizations"
-    "with many grants from causing exponentially large numbers of similar rows."
+    "as renewals, the 2023 grant is a renewal of 2022, and 2022 is a renewal of 2021. The 2023 grant "
+    "is not a renewal of 2021 because the 2022 grant is more recent. This prevents organizations "
+    "with many grants from producing exponentially large numbers of similar rows."
 )

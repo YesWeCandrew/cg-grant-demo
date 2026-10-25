@@ -1,6 +1,6 @@
 """Loads the grant data and works out which grants count as renewals.
 
-A "pair" is a row of mart_grant_pairs: two grants to the same organisation, where the
+A "pair" is a row of mart_grant_pairs: two grants to the same organization, where the
 second (renewed) grant came after the first. Each grant can appear in many pairs.
 Whether a grant is a first or repeat grant is defined in dbt, as grant_sequence in fct_grants.
 """
