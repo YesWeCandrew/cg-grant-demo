@@ -3,6 +3,7 @@
 A "pair" is a row of mart_grant_pairs: two grants to the same organisation, where the
 second (renewed) grant came after the first. Each grant can appear in many pairs.
 """
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 import pandas as pd
@@ -24,8 +25,11 @@ def get_client():
     return bigquery.Client(credentials=creds, project=creds.project_id)
 
 @st.cache_data(ttl=3600)
-def load_table(table: str):
-    return get_client().query(f"select * from `{table}`").to_dataframe()
+def load_tables(*tables: str) -> list[pd.DataFrame]:
+    """Load each table in full, running the queries concurrently."""
+    client = get_client()
+    with ThreadPoolExecutor() as pool:
+        return list(pool.map(lambda table: client.query(f"select * from `{table}`").to_dataframe(), tables))
 
 # --- Renewal logic ---
 
@@ -79,7 +83,7 @@ def exclusion_reason(pair: pd.Series, d: RenewalDefinition) -> str:
         return f"{pair['months_since_first']} months apart ({side} than {d.min_months}–{d.max_months})"
     if not pair["ratio_ok"]:
         side = "below" if pair["amount_ratio"] < d.min_ratio else "above"
-        return f"Amount ratio {pair['amount_ratio']:.2f} ({side} {d.min_ratio:.2f}–{d.max_ratio:.2f})"
+        return f"Second grant is {pair['amount_ratio']:.0%} of the first ({side} {d.min_ratio:.0%}–{d.max_ratio:.0%})"
     return f"Different focus area ({pair['first_focus_area']} → {pair['renewed_focus_area']})"
 
 def find_near_misses(pairs: pd.DataFrame, renewed_ids: set, d: RenewalDefinition) -> pd.DataFrame:

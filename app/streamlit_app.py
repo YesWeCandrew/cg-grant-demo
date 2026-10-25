@@ -2,9 +2,9 @@ import hmac
 import altair as alt
 import pandas as pd
 import streamlit as st
-from queries import MONTH_MARGIN, RATIO_MARGIN, RenewalDefinition, evaluate, load_table
+from queries import MONTH_MARGIN, RATIO_MARGIN, RenewalDefinition, evaluate, load_tables
 
-st.set_page_config(page_title="Defining a grant renewal", layout="wide")
+st.set_page_config(page_title="What counts as a renewal?", layout="wide")
 
 RENEWAL_COLOR = "#064D49"
 NON_RENEWAL_COLOR = "#B2CFED"
@@ -28,23 +28,42 @@ if not check_password():
 
 st.title("What counts as a renewal?")
 st.write(
-    "Explore how to define a renewal. Use the options on the left to create a definition "
-    "of a renewal and discover how it impacts data definitions."
+    "This dashboard explores metadata based definitions of a renewed grant. "
 )
-grants = load_table(st.secrets["grants_table"])
-pairs = load_table(st.secrets["pairs_table"])
+st.write(
+    "Grant renewals, which is when one organization is given a related, subsequent grant after an initial grant, "
+    "are not indicated in the source data. This dashboard explores whether it is possible to find a definition "
+    "for a renewal using only grant metadata, such as amount, date and focus area - without using contextual information"
+)
+st.write(
+    "Using the options on the left, choose your definitions to see how it impacts what counts as a renewal. "
+    "Your current definition is:"
+)
+grants, pairs = load_tables(st.secrets["grants_table"], st.secrets["pairs_table"])
 
 # --- Definition options ---
 st.sidebar.header("Define a renewal")
 min_months, max_months = st.sidebar.slider(
-    "Months between first grant and renewal", min_value=1, max_value=60, value=(12, 24)
+    "Months between first grant and renewal",
+    min_value=1, max_value=60, value=(12, 24),
+    help="Only subsequent grants that occured between the months specified here will be counted as a renewal. For example, 12 to 24 months means the second grant must be at least a year after the earlier, and at most 2 years."
 )
-min_ratio, max_ratio = st.sidebar.slider(
-    "Ratio of renewal amount to first grant amount",
-    min_value=0.0, max_value=5.0, value=(0.8, 2.0), step=0.05,
-    help="1.0 means the renewal was the same amount as the first grant; 2.0 means double.",
+min_percent, max_percent = st.sidebar.slider(
+    "Renewed amount as a percent of first grant amount",
+    min_value=0, max_value=500, value=(80, 200), step=5, format="%d%%",
+    help="Only subsequent grants that are for a value between the percentages of the first grant defined here will be included. For example, 80% to 200% means the second grant must be the at least 80% of the size of the earlier, and at most twice as large to count as a renewal.",
 )
-same_focus_area = st.sidebar.checkbox("Only include same focus area grants", value=True)
+# The renewal logic works in ratios, so 100% is a ratio of 1.0
+min_ratio, max_ratio = min_percent / 100, max_percent / 100
+same_focus_area = st.sidebar.checkbox("Renewals must be for the same focus area", value=True, help="If selected, this means that subsequent grants only count as renewals if they are in the same focus area.")
+
+months = f"{min_months} month{'s' * (min_months != 1)}" if min_months == max_months else f"{min_months}–{max_months} months"
+percent = f"{min_percent}%" if min_percent == max_percent else f"between {min_percent}% and {max_percent}%"
+focus = ", `is in the same focus area`" if same_focus_area else ""
+st.markdown(
+    f"##### A grant is a renewal if it's made `{months}` after an earlier grant to the same "
+    f"organisation{focus}, and is `{percent}` of the amount of that grant.**"
+)
 
 results = evaluate(
     grants, pairs, RenewalDefinition(min_months, max_months, min_ratio, max_ratio, same_focus_area)
@@ -100,12 +119,14 @@ PAIR_COLUMNS = {
 
 def show_grant(pair: pd.Series, prefix: str):
     """Show one side of a pair; prefix is "first" or "renewed", matching the mart's column names."""
+    # The name and details aren't in the pairs mart, so look them up in fct_grants
+    grant = grants.loc[grants["grant_id"] == pair[f"{prefix}_grant_id"]].iloc[0]
     fields = {
-        "Name": pair[f"{prefix}_grant"],
+        "Name": grant["grant"],
         "Amount": f"${pair[f'{prefix}_amount']:,.0f}",
         "Date": f"{pd.to_datetime(pair[f'{prefix}_grant_date']):%B %Y}",
         "Focus area": pair[f"{prefix}_focus_area"],
-        "Details": pair[f"{prefix}_details"],
+        "Details": grant["details"],
     }
     for label, value in fields.items():
         st.caption(label)
@@ -116,7 +137,7 @@ def show_pair(pair: pd.Series):
     """Pop-out content: shared figures at the top, then the two grants side by side."""
     months, ratio = st.columns(2)
     months.metric("Months apart", f"{pair['months_since_first']}")
-    ratio.metric("Amount ratio", f"{pair['amount_ratio']:.2f}")
+    ratio.metric("Second grant as % of first", f"{pair['amount_ratio']:.0%}")
     # Only near misses have a reason
     if pair.get("reason"):
         st.markdown(f"**Why it's excluded:** {pair['reason']}")
@@ -160,7 +181,7 @@ with renewals_tab:
 with near_tab:
     st.write(
         "Pairs of grants to the same organisation that fail just one part of the definition, "
-        f"and are within {MONTH_MARGIN} months of the month range or {RATIO_MARGIN} of the ratio range. "
+        f"and are within {MONTH_MARGIN} months of the month range or {RATIO_MARGIN:.0%} of the percentage range. "
         "The second grant isn't counted as a renewal of any other grant."
     )
     selected_near_miss = pair_table(results.near_misses, key="near_misses")
