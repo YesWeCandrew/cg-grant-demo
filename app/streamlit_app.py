@@ -29,12 +29,12 @@ if not check_password():
 
 st.title("What counts as a renewal?")
 st.write(
-    "This dashboard explores metadata based definitions of a renewed grant. "
+    "This dashboard explores metadata based definitions of a renewed grant."
 )
 st.write(
-    "Grant renewals, which is when one organization is given a related, subsequent grant after an initial grant, "
-    "are not indicated in the source data. This dashboard explores whether it is possible to find a definition "
-    "for a renewal using only grant metadata, such as amount, date and focus area - without using contextual information"
+    "Grant renewals, where one organization is given a related subsequent grant after an initial grant, "
+    "are not indicated in the source data. This dashboard explores whether it is possible to create a definition "
+    "to identify genuine renewals using only grant metadata, such as amount, date and focus area - and no contextual information."
 )
 st.write(
     "Using the options on the left, choose your definitions to see how it impacts what counts as a renewal. "
@@ -135,7 +135,6 @@ def show_grant(pair: pd.Series, prefix: str):
     fields = {
         "Name": grant["grant"],
         "Amount": f"${pair[f'{prefix}_amount']:,.0f}",
-        "Date": f"{pd.to_datetime(pair[f'{prefix}_grant_date']):%B %Y}",
         "Focus area": pair[f"{prefix}_focus_area"],
         "Details": grant["details"],
     }
@@ -146,19 +145,22 @@ def show_grant(pair: pd.Series, prefix: str):
 
 def show_pair(pair: pd.Series):
     """Pop-out content: shared figures at the top, then the two grants side by side."""
-    months, ratio = st.columns(2)
+    months, difference, ratio = st.columns(3)
     months.metric("Months apart", f"{pair['months_since_first']}")
-    ratio.metric("Second grant as % of first", f"{pair['amount_ratio']:.0%}")
+    amount_difference = pair["renewed_amount"] - pair["first_amount"]
+    sign = "-" if amount_difference < 0 else "+"
+    difference.metric("Difference in Amount", f"{sign}${abs(amount_difference):,.0f}")
+    ratio.metric("Amount as % of First Grant", f"{pair['amount_ratio']:.0%}")
     # Only near misses have a reason
     if pair.get("reason"):
         st.markdown(f"**Why it's excluded:** {pair['reason']}")
 
     first, second = st.columns(2, border=True)
     with first:
-        st.subheader("First grant")
+        st.subheader(f"First grant: {pd.to_datetime(pair['first_grant_date']):%B %Y}")
         show_grant(pair, "first")
     with second:
-        st.subheader("Second grant")
+        st.subheader(f"Second grant: {pd.to_datetime(pair['renewed_grant_date']):%B %Y}")
         show_grant(pair, "renewed")
 
 # Tables are keyed by a version number. Bumping it when the pop-out closes clears their
