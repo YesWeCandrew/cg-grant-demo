@@ -17,8 +17,7 @@ from {{ ref('fct_grants') }} renewed
 
 join {{ ref('fct_grants') }} first
     on renewed.organization_id = first.organization_id
-    and first.grant_date <= renewed.grant_date
-    and first.grant_id != renewed.grant_id
+    and first.org_grant_number < renewed.org_grant_number
 
 join {{ ref('dim_organizations')}} org
     on org.organization_id = first.organization_id
@@ -28,5 +27,3 @@ join {{ ref('dim_focus_areas')}} first_fa
 
 join {{ ref('dim_focus_areas')}} renewed_fa
     on renewed_fa.focus_area_id = renewed.focus_area_id
-
-where date_diff(renewed.grant_date, first.grant_date, month) <= 60

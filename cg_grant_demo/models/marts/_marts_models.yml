@@ -28,6 +28,25 @@ models:
         description: "A unique identifier for the organization granted"
       - name: details
         description: "A textual description of the details of the grant"
+      - name: org_grant_number
+        description: "The order of this grant among all grants to the same organization, starting at 1. Grants in the same month are ordered at random. Grants with no organization are always 1"
+        data_tests:
+          - not_null
+      - name: previous_grant_date
+        description: "The date of the organization's previous grant. Null for first grants"
+      - name: months_since_previous_grant
+        description: "The months between the organization's previous grant and this one. 0 if both were in the same month, null for first grants"
+        data_tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+      - name: grant_sequence
+        description: "'First' if this is the organization's first grant, otherwise 'Repeat'. Grants with no organization are counted as first grants"
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['First', 'Repeat']
 
   - name: dim_focus_areas
     description: "The focus areas that grants target"
@@ -46,7 +65,7 @@ models:
         description: "A unique identifier for the organization granted"
 
   - name: mart_grant_pairs
-    description: "Pairs of grants that could potentially be renewals, depending on definitions"
+    description: "Every pair of grants to the same organization, where the second came after the first, that could potentially be renewals, depending on definitions"
     columns:
       - name: renewed_grant_id
         description: "The grant id of the later of the two paired grants"
@@ -59,7 +78,7 @@ models:
       - name: organization
         description: "The name of the organisation the grant is for"
       - name: months_since_first
-        description: "The months between the first and the second grant"
+        description: "The months between the first and the second grant. 0 if both were in the same month"
       - name: amount_ratio
         description: "The ratio of the amount that the second grant was for"
       - name: renewed_amount
